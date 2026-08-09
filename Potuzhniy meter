@@ -1,0 +1,200 @@
+package com.example.myapplication;
+
+import android.graphics.Color;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+
+    private ProgressBar progressBar;
+    private TextView textPercent;
+    private TextView textHint;
+    
+    private int progressStatus = 0;
+    private boolean isHolding = false;
+    private boolean isExploded = false;
+    
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable chargeRunnable;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Інтерфейс додатку
+        LinearLayout rootLayout = new LinearLayout(this);
+        rootLayout.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
+        rootLayout.setGravity(android.view.Gravity.CENTER);
+        rootLayout.setPadding(48, 48, 48, 48);
+        rootLayout.setBackgroundColor(Color.parseColor("#0057B7"));
+
+        TextView title = new TextView(this);
+        title.setText("ПОТУЖНИЙ МЕТР");
+        title.setTextSize(28);
+        title.setTextColor(Color.WHITE);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setGravity(android.view.Gravity.CENTER);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, 
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, 0, 0, 80);
+        rootLayout.addView(title, titleParams);
+
+        textPercent = new TextView(this);
+        textPercent.setText("0%");
+        textPercent.setTextSize(56);
+        textPercent.setTextColor(Color.WHITE);
+        textPercent.setTypeface(null, android.graphics.Typeface.BOLD);
+        textPercent.setGravity(android.view.Gravity.CENTER);
+        LinearLayout.LayoutParams percentParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, 
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        percentParams.setMargins(0, 0, 0, 40);
+        rootLayout.addView(textPercent, percentParams);
+
+        progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progressBar.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 80));
+        progressBar.setMax(100);
+        progressBar.setProgress(0);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 80);
+        progressParams.setMargins(0, 0, 0, 80);
+        rootLayout.addView(progressBar, progressParams);
+
+        textHint = new TextView(this);
+        textHint.setText("Затисни в будь-якому місці екрана!");
+        textHint.setTextSize(16);
+        textHint.setTextColor(Color.WHITE);
+        textHint.setTypeface(null, android.graphics.Typeface.BOLD);
+        textHint.setGravity(android.view.Gravity.CENTER);
+        rootLayout.addView(textHint);
+
+        setContentView(rootLayout);
+
+        // Процес набору потужності
+        chargeRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isHolding && progressStatus < 100 && !isExploded) {
+                    progressStatus += 2;
+                    if (progressStatus > 100) {
+                        progressStatus = 100;
+                    }
+                    
+                    updateInterfaceUI();
+
+                    if (progressStatus == 100) {
+                        isExploded = true;
+                        
+                        if (textPercent != null) textPercent.setText("БАБАХ! 💥");
+                        if (textHint != null) textHint.setText("Максимальне перевантаження!");
+
+                        // Повернення у початковий стан через 3 секунди
+                        handler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                resetGameToInitialState();
+                            }
+                        }, 3000);
+
+                    } else {
+                        handler.postDelayed(this, 50);
+                    }
+                }
+            }
+        };
+
+        // Слухач дотиків
+        rootLayout.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                if (isExploded) {
+                    return true;
+                }
+
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        if (!isHolding) {
+                            isHolding = true;
+                            handler.removeCallbacks(chargeRunnable);
+                            handler.post(chargeRunnable);
+                        }
+                        return true;
+
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (isHolding) {
+                            isHolding = false;
+                            handler.removeCallbacks(chargeRunnable);
+                            if (!isExploded) {
+                                startDischargingProcess();
+                            }
+                        }
+                        return true;
+                }
+                return false;
+            }
+        });
+    }
+
+    private void startDischargingProcess() {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (!isHolding && progressStatus > 0 && !isExploded) {
+                    progressStatus -= 3;
+                    if (progressStatus < 0) {
+                        progressStatus = 0;
+                    }
+
+                    updateInterfaceUI();
+
+                    if (progressStatus > 0) {
+                        handler.postDelayed(this, 50);
+                    }
+                }
+            }
+        });
+    }
+
+    private void updateInterfaceUI() {
+        if (progressBar != null) {
+            progressBar.setProgress(progressStatus);
+        }
+        
+        if (textPercent != null) {
+            textPercent.setText(progressStatus + "%");
+
+            if (progressStatus < 50) {
+                textPercent.setTextColor(Color.parseColor("#4CAF50"));
+            } else if (progressStatus < 85) {
+                textPercent.setTextColor(Color.parseColor("#FFEB3B"));
+            } else {
+                textPercent.setTextColor(Color.parseColor("#F44336"));
+            }
+        }
+    }
+
+    private void resetGameToInitialState() {
+        progressStatus = 0;
+        isExploded = false;
+        isHolding = false;
+        updateInterfaceUI();
+        
+        if (textHint != null) {
+            textHint.setText("Затисни в будь-якому місці екрана!");
+        }
+    }
+}
